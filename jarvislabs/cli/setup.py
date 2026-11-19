@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Annotated
 
 import questionary
 import typer
+from rich.color import Color
 from rich.markup import escape
+from rich.style import Style
 from rich.text import Text
 
 from jarvislabs.cli import options as cli_options, render, state
@@ -39,13 +41,61 @@ ADDITIONAL_AGENTS: dict[str, tuple[str, Path]] = {
 }
 
 WORDMARK = """\
-    ▄▄▄▄▄▖                       ▄▄▖        ▐██          ██▌
-    ▀▀▀▜█▌                       ▝▀▘        ▐██          ██▌
-       ▐█▌ ▄█████▙▖ ▗▟██ ██▌  ██ ██▌▗▟█████ ▐██ ▗█████▙▖ ██▙████▄ ▗█████▙
-██▖    ▐█▌▗██▘  ▜█▙ ██▛  ██▌ ▗██ ██▌▝██▙▄▄▖ ▐██ ██▘  ▜██ ██▛  ▝██▖▜██▄▄▄
-▜█▙▖  ▄██▘▝██▄ ▗▟██ ██▌  ██▙▄██▛ ██▌  ▝▀▀██▌▐██ ██▄  ▟██ ▜█▙▖ ▄██▘  ▀▀▜██
- ▀▜████▛▘  ▀████▜██ ██▘  ████▀▘  ▜█▌ █████▛▘▐██ ▝▜███▀██  ▀████▛▘ ▐█████▀
+   ▗▄▄▄▄▖                     ▄▄        ██▌        ▐█▌
+   ▝▀▀▜█▌                     ▀▀        ██▌        ▐█▌
+      ▐█▌ ▄████▙▖ ▗▟█▌▐██  ██ ██ ▄█████ ██▌▗▟████▄ ▐█▙████▖ ▟████▌
+█▙    ▐█▌▐█▛  ▝██ ██▀ ▐██  ██ ██ ▜█▙▄▄  ██▌▟█▌  ▜█▌▐█▛  ▝██ ██▄▄▄
+▜█▙  ▗▟█▌▐█▙▖ ▗██ ██  ▐█▙▗▟█▌ ██   ▀▀██▖██▌▜█▙  ▟█▌▝█▙▖ ▄██  ▝▀▜██
+ ▀████▛▀  ▀███▛██ ██  ▐███▛▘  ██ ▐████▛ ██▌▝▜███▜█▌ ▝████▛▘ █████▀
 """
+
+# 11x12 pixel grid paired into 6 half-block rows (▀/▄) beside the 6-row wordmark (79 cols total).
+# Dots are transparent so outer corners inherit the terminal's own background.
+_LOGO_PALETTE: dict[str, tuple[int, int, int]] = {
+    "a": (98, 202, 251),
+    "b": (89, 204, 250),
+    "c": (98, 215, 251),
+    "d": (79, 205, 249),
+    "e": (107, 239, 254),
+    "f": (99, 238, 253),
+    "g": (77, 222, 250),
+    "h": (60, 210, 247),
+    "i": (67, 201, 247),
+    "j": (121, 195, 251),
+    "k": (71, 211, 248),
+    "l": (58, 199, 246),
+    "m": (143, 106, 243),
+    "n": (122, 174, 248),
+    "o": (183, 152, 254),
+    "p": (173, 141, 251),
+    "q": (153, 118, 246),
+    "r": (133, 102, 242),
+    "s": (132, 147, 252),
+    "t": (155, 138, 250),
+    "u": (139, 114, 244),
+    "v": (123, 101, 241),
+    "w": (54, 139, 249),
+    "x": (113, 143, 251),
+    "y": (93, 184, 255),
+    "z": (83, 173, 253),
+    "A": (63, 150, 250),
+    "B": (45, 129, 247),
+}
+_LOGO_PIXELS: tuple[str, ...] = (
+    "....aaa....",
+    "..abbbbba..",
+    "cdddddddddc",
+    "efghhihhgfe",
+    "..jcklkcj..",
+    ".mmmncnmmm.",
+    "opqmrrrmqpo",
+    "..stuvuts..",
+    ".wwwxtxwww.",
+    "yzAwwwwwAzy",
+    "..yzwBwzy..",
+    "....yzy....",
+)
+_LOGO_GAP = "  "
 
 
 # ── Login ────────────────────────────────────────────────────────────────────
@@ -343,15 +393,48 @@ def _show_next_steps() -> None:
         )
 
 
-def _show_header() -> None:
-    """Print the setup header: the wordmark, or a one-line heading when it can't be shown.
+def _banner() -> Text:
+    """Build the setup banner with the gradient mark when the console supports it.
 
-    The wordmark needs an interactive terminal at least 80 columns wide, and no --yes.
+    Combines the 11x6 half-block diamond mark with the wordmark on 256-colour or
+    truecolor Unicode consoles; returns the plain wordmark otherwise.
+
+    Returns:
+        The styled banner text, ending with a newline.
+    """
+    if render.console.color_system not in ("truecolor", "256") or render.MARKS is not render.UNICODE_MARKS:
+        return Text(WORDMARK)
+
+    banner = Text()
+    for top_row, bot_row, wordmark_row in zip(
+        _LOGO_PIXELS[0::2], _LOGO_PIXELS[1::2], WORDMARK.splitlines(), strict=True
+    ):
+        for top_key, bot_key in zip(top_row, bot_row, strict=True):
+            top = _LOGO_PALETTE.get(top_key)
+            bot = _LOGO_PALETTE.get(bot_key)
+            if top is not None and bot is not None:
+                banner.append("▀", style=Style(color=Color.from_rgb(*top), bgcolor=Color.from_rgb(*bot)))
+            elif top is not None:
+                banner.append("▀", style=Style(color=Color.from_rgb(*top)))
+            elif bot is not None:
+                banner.append("▄", style=Style(color=Color.from_rgb(*bot)))
+            else:
+                banner.append(" ")
+        banner.append(_LOGO_GAP)
+        banner.append(wordmark_row)
+        banner.append("\n")
+    return banner
+
+
+def _show_header() -> None:
+    """Print the setup banner, or a one-line heading when it cannot be shown.
+
+    The banner needs an interactive terminal at least 80 columns wide, and no --yes.
     """
     if not state.yes and render.can_prompt() and render.console.width >= 80:
         render.console.print()
-        # No blank line here: each block after the wordmark prints its own first.
-        render.console.print(WORDMARK, markup=False, highlight=False, end="")
+        # No blank line here: each block after the banner prints its own first.
+        render.console.print(_banner(), highlight=False, end="")
     else:
         render.heading("Jarvislabs CLI setup")
 

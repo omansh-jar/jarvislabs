@@ -33,7 +33,9 @@ the platform belongs in docs.** Do not duplicate a tutorial in both; one will go
 
 ### Setup
 
-8. Wordmark on any interactive setup with ≥80 columns, unless `--yes`. No version line under it.
+8. Banner (11×6 gradient diamond mark + 66-col wordmark, 79 cols total) on any interactive setup
+   with ≥80 columns, unless `--yes`. The mark is omitted when the console lacks 256-colour/truecolor
+   or Unicode, leaving the wordmark alone. No version line under it.
 9. Phase rules: `SIGN IN`, `AGENT SKILLS`, `GET STARTED`. Uppercase, bold default, over a grey line.
 10. The body sits directly under its heading — no blank line between them. A blank line goes before
     the next block.
@@ -108,11 +110,14 @@ Rules:
 32. Warnings and errors may tint their short message; they are rare and need attention.
 33. Headings are never cyan; cyan means act here. If headings and commands share cyan, neither reads.
 34. No decorative hues. Orange is warning territory. Magenta/green panel borders were removed.
-35. Named ANSI colours only; no `rgb(...)` or hex. The user's theme owns light/dark.
+35. Named ANSI colours only; no `rgb(...)` or hex. The user's theme owns light/dark. Exception: the
+    setup banner's diamond mark uses 24-bit RGB half-blocks via `Color.from_rgb` with transparent
+    outer corners so it works on dark and light themes, and drops automatically on `NO_COLOR`,
+    16-colour, or legacy consoles.
 36. Use bold and spacing before saturation. If it only works because it is bright, it does not work.
 37. Marks and words carry state together; colour is never the only signal. `NO_COLOR` keeps both marks
     and plain text.
-38. No emoji as UI chrome. The brand mark is the wordmark and the cyan `.ai`, not `⚡`.
+38. No emoji as UI chrome. The brand mark is the diamond mark and wordmark, not `⚡`.
 39. Links are accent, underlined and clickable where the terminal supports OSC 8. The underline is
     the signal in error messages and anywhere the terminal can't make the link clickable.
 
